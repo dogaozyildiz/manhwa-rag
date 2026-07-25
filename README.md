@@ -109,14 +109,34 @@ python -m eval.run_eval --with-answers     # adds generation (needs a key)
 pytest -q
 ```
 
-**Generation** needs a free key from [aistudio.google.com](https://aistudio.google.com/apikey)
-in `.env` as `GOOGLE_API_KEY=...`. Retrieval, filter extraction, routing and the
+**Generation** needs a free key from [console.groq.com](https://console.groq.com/keys)
+in `.env` as `GROQ_API_KEY=...`. Retrieval, filter extraction, routing and the
 whole eval's retrieval tier work without it — `POST /retrieve` returns matched
 sources, applied filters and the chosen route with no key at all.
 
-> Free-tier data may be used to improve Google's products. Harmless for public
-> manhwa metadata; worth knowing before pointing anything like this at private
-> documents.
+### Choosing a provider
+
+Generation sits behind `app/answer/provider.py`; set `LLM_PROVIDER` in `.env`.
+
+| value | needs | notes |
+|---|---|---|
+| `groq` (default) | free key, no card | Llama 3.3 70B. Available in the EU. |
+| `ollama` | nothing — local | No account, no network, no region limits. Weaker answers; see below. |
+| `gemini` | free key | **Unusable in the EEA.** See below. |
+
+**Gemini's free tier allocates zero generation quota in the EEA.** A correctly
+created AI Studio key on a Free-tier project authenticates and lists all 41
+models, but every `generateContent` call returns HTTP 429 with
+`limit: 0` on `generate_content_free_tier_requests`. It is not
+an exhausted quota or a propagation delay — the allocation is zero, and the only
+Google-side fix is enabling billing. Recorded here because the symptom looks
+like a broken key and it costs an hour to diagnose.
+
+**Ollama is the answer to "our documents cannot leave our infrastructure."**
+Install from [ollama.com](https://ollama.com), `ollama pull qwen2.5:7b`, set
+`LLM_PROVIDER=ollama`. Expect lower answer quality than a hosted 70B model —
+running this eval against both is the point, since it quantifies exactly what
+on-prem costs rather than hand-waving about it.
 
 ### Endpoints
 

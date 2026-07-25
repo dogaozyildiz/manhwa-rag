@@ -26,7 +26,20 @@ You built and measured this, so these are defensible in a client call:
   it's why you can explain every layer.
 - One practice project, not years of production RAG.
 - Single-tenant, no auth, not load-tested.
-- Gemini free tier, not a production-scale deployment.
+- Free-tier hosted generation (Groq), not a production-scale deployment.
+
+## A thing worth mentioning unprompted
+
+You hit — and diagnosed — a real infrastructure constraint: **Google's Gemini
+free tier allocates zero generation quota in the EEA.** A correctly created key
+authenticates and lists every model, then returns `limit: 0` on
+every generation call. Because generation sat behind a provider interface,
+switching to Groq was one new file; retrieval, filters, routing, verification
+and every measured number were untouched.
+
+That is a small story with a real point: you build the vendor boundary *before*
+you need it. Worth telling in a call about any provider-dependent system,
+because it shows you design for the swap rather than discovering it the hard way.
 
 ## Still do not claim
 

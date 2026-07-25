@@ -19,10 +19,23 @@ class Settings(BaseSettings):
     embedding_model: str = "intfloat/multilingual-e5-small"
     embedding_dim: int = 384
 
-    # Generation. The only piece needing an account (aistudio.google.com,
-    # free tier, no card). Swappable via app/answer/provider.py.
+    # Generation. The only piece needing an account. Swappable via
+    # app/answer/provider.py — "groq", "gemini" or "ollama".
+    #
+    # Groq is the default because Google's Gemini free tier allocates zero
+    # generation quota in the EEA: the key authenticates and lists models, but
+    # every call returns `limit: 0` on the free-tier quota metric.
+    llm_provider: str = "groq"
+
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+
     google_api_key: str = ""
     answer_model: str = "gemini-2.0-flash"
+
+    # Local generation via Ollama — no account, no network, no region limits.
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:7b"
 
     # Corpus size
     n_manhwa: int = 350
