@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manhwa RAG — catalogue and industry Q&A with verified citations</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<style>
+  :root {
+    --bg:#fbfaf8; --fg:#1b1a18; --muted:#6d6a64; --line:#e4e1db;
+    --accent:#7a4bd8; --accent-bg:#f0eaff; --card:#fff; --warn:#a4620d;
+    --warn-bg:#fdf3e3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#141317; --fg:#e9e7e2; --muted:#9b9790; --line:#2c2a31;
+      --accent:#b79bf0; --accent-bg:#241d38; --card:#1b1a20; --warn:#e0aa60;
+      --warn-bg:#302512;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:2.5rem 1.25rem 4rem;background:var(--bg);color:var(--fg);
+       font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:800px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 .35rem;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 1.75rem;font-size:.95rem}
+  form{display:flex;gap:.6rem;margin-bottom:1.25rem}
+  input[type=text]{flex:1;padding:.7rem .85rem;font-size:1rem;color:var(--fg);
+       background:var(--card);border:1px solid var(--line);border-radius:8px}
+  input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  button{padding:.7rem 1.15rem;font-size:1rem;font-weight:550;cursor:pointer;
+       background:var(--accent);color:#fff;border:0;border-radius:8px}
+  button:disabled{opacity:.6;cursor:progress}
+  .examples{font-size:.875rem;color:var(--muted);margin-bottom:2rem}
+  .examples button{background:none;color:var(--accent);border:1px solid var(--line);
+       padding:.3rem .6rem;border-radius:999px;font-size:.8rem;margin:.25rem .25rem 0 0;
+       font-weight:400}
+  .examples .grp{display:block;margin-top:.6rem;font-size:.75rem;
+       text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .htmx-indicator{display:none}
+  .htmx-request .htmx-indicator{display:inline}
+</style>
+</head>
+<body>
+<main>
+  <h1>Manhwa RAG</h1>
+  <p class="sub">
+    500 series (350 Korean manhwa, 150 Japanese manga) plus 43 industry
+    articles. Structured constraints become SQL filters; the rest is semantic
+    search. Every quoted citation is checked to appear verbatim in the source
+    it names — unverifiable ones are discarded rather than shown.
+  </p>
+
+  <form hx-post="/ui/ask" hx-target="#result" hx-swap="innerHTML" hx-disabled-elt="find button">
+    <input type="text" name="question" id="question" required autocomplete="off"
+           placeholder="e.g. completed romance manhwa under 100 chapters">
+    <button type="submit">Ask <span class="htmx-indicator">…</span></button>
+  </form>
+
+  <div class="examples">
+    <span class="grp">Filters become SQL</span>
+    <button type="button" onclick="fill(this)">completed romance manhwa under 100 chapters</button>
+    <button type="button" onclick="fill(this)">japanese manga that started before 2000</button>
+    <span class="grp">Aliases across scripts</span>
+    <button type="button" onclick="fill(this)">Kimetsu no Yaiba</button>
+    <button type="button" onclick="fill(this)">나 혼자만 레벨업</button>
+    <span class="grp">Industry questions</span>
+    <button type="button" onclick="fill(this)">What is scanlation?</button>
+    <button type="button" onclick="fill(this)">How does the Webtoon platform make money?</button>
+    <span class="grp">Should be declined</span>
+    <button type="button" onclick="fill(this)">What were Naver Webtoon's exact quarterly earnings in 2024?</button>
+  </div>
+
+  <div id="result"></div>
+</main>
+<script>
+  function fill(el){ document.getElementById('question').value = el.textContent.trim(); }
+</script>
+</body>
+</html>

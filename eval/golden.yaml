@@ -1,0 +1,325 @@
+# Golden evaluation set.
+#
+# Corpus: 500 AniList series (350 Korean manhwa, 150 Japanese manga) plus 43
+# Wikipedia industry articles (570 chunks).
+#
+# Every expected ref was checked against the ingested database before being
+# written here, and every unanswerable question was checked to be genuinely
+# absent — a refusal only means something if the answer really is not there.
+#
+# Fields:
+#   question         what the user asks
+#   group            alias | filtered | recommend | industry | unanswerable
+#   answerable       false => the correct behaviour is to decline
+#   expected_refs    retrieval is a hit if ANY of these is in the top-k
+#   expected_filters structured predicates extraction must produce (scored
+#                    separately from retrieval — this is the metric unique to
+#                    this project)
+#   expected_route   catalogue | industry | both
+#   gist             what a correct answer must convey
+
+# ---------------------------------------------------------------- alias lookup
+# Aliases across scripts and romanisations. Dense embeddings blur these; exact
+# match misses them entirely. This group is what trigram matching is for.
+
+- question: Kimetsu no Yaiba
+  group: alias
+  answerable: true
+  expected_refs: ["series:87216"]
+  expected_route: both
+  gist: Demon Slayer, a completed Japanese manga of 207 chapters begun in 2016.
+
+- question: What is Na Honjaman Level Up about?
+  group: alias
+  answerable: true
+  expected_refs: ["series:105398"]
+  expected_route: catalogue
+  gist: >-
+    Solo Leveling, a completed Korean manhwa of 201 chapters, about Seong Jin-U,
+    the weakest hunter, who gains the ability to level up.
+
+- question: 나 혼자만 레벨업
+  group: alias
+  answerable: true
+  expected_refs: ["series:105398"]
+  expected_route: both
+  gist: Solo Leveling, the Korean manhwa about a hunter who can level up.
+
+- question: Sinui Tap
+  group: alias
+  answerable: true
+  expected_refs: ["series:85143"]
+  expected_route: both
+  gist: Tower of God, an ongoing Korean manhwa begun in 2010.
+
+- question: Shingeki no Kyojin chapter count
+  group: alias
+  answerable: true
+  expected_refs: ["series:53390"]
+  expected_route: catalogue
+  gist: Attack on Titan finished with 141 chapters.
+
+- question: Jeonjijeok Dokja Sijeom
+  group: alias
+  answerable: true
+  expected_refs: ["series:119257"]
+  expected_route: both
+  gist: Omniscient Reader, an ongoing Korean manhwa begun in 2020.
+
+# ------------------------------------------------------------ filtered lookup
+# The half-SQL half-embeddings group. Scored on whether the extracted
+# predicates are right, independently of which rows come back.
+
+- question: completed romance manhwa under 100 chapters
+  group: filtered
+  answerable: true
+  expected_refs: ["series:145551"]
+  expected_route: catalogue
+  expected_filters:
+    country: KR
+    status: FINISHED
+    max_chapters: 100
+    genres: [Romance]
+  gist: >-
+    A list of finished Korean romance manhwa each shorter than 100 chapters,
+    such as Marry My Husband.
+
+- question: ongoing korean fantasy manhwa
+  group: filtered
+  answerable: true
+  expected_refs: ["series:119257", "series:85143"]
+  expected_route: catalogue
+  expected_filters:
+    country: KR
+    status: RELEASING
+    genres: [Fantasy]
+  gist: Ongoing Korean fantasy manhwa such as Omniscient Reader or Tower of God.
+
+- question: japanese manga that started before 2000
+  group: filtered
+  answerable: true
+  expected_refs: ["series:30013", "series:30002"]
+  expected_route: catalogue
+  expected_filters:
+    country: JP
+    max_year: 2000
+  gist: Long-running Japanese manga begun before 2000, such as One Piece or Berserk.
+
+- question: finished manhwa with more than 200 chapters
+  group: filtered
+  answerable: true
+  expected_refs: ["series:105398"]
+  expected_route: catalogue
+  expected_filters:
+    country: KR
+    status: FINISHED
+    min_chapters: 200
+  gist: Completed Korean manhwa exceeding 200 chapters, such as Solo Leveling.
+
+- question: action manhwa with no romance
+  group: filtered
+  answerable: true
+  expected_refs: ["series:105398", "series:86848"]
+  expected_route: catalogue
+  expected_filters:
+    country: KR
+    genres: [Action]
+    exclude_genres: [Romance]
+  gist: Korean action manhwa that are not tagged romance.
+
+- question: horror manga rated above 80
+  group: filtered
+  answerable: true
+  expected_refs: []
+  expected_route: catalogue
+  expected_filters:
+    country: JP
+    genres: [Horror]
+    min_score: 80
+  gist: Highly rated Japanese horror manga.
+
+- question: completed japanese manga between 100 and 250 chapters
+  group: filtered
+  answerable: true
+  expected_refs: ["series:53390", "series:87216"]
+  expected_route: catalogue
+  expected_filters:
+    country: JP
+    status: FINISHED
+    min_chapters: 100
+    max_chapters: 250
+  gist: >-
+    Finished Japanese manga in the 100-250 chapter range, such as Attack on
+    Titan (141) or Demon Slayer (207).
+
+- question: korean drama manhwa since 2020
+  group: filtered
+  answerable: true
+  expected_refs: []
+  expected_route: catalogue
+  expected_filters:
+    country: KR
+    genres: [Drama]
+    min_year: 2020
+  gist: Korean drama manhwa that began publication in 2020 or later.
+
+# ------------------------------------------------------------- recommendation
+# Semantic similarity, where embeddings do the work.
+
+# Recommendation is inherently one-to-many, so `expected_refs` lists an
+# ACCEPTABLE SET, not a single gold answer. Scoring these against one "correct"
+# series would penalise a system for returning a different, equally valid
+# recommendation — which is not a retrieval failure.
+
+- question: recommend something similar to Solo Leveling
+  group: recommend
+  answerable: true
+  expected_refs: ["series:105398", "series:128067", "series:141958"]
+  expected_route: catalogue
+  gist: >-
+    Progression-fantasy manhwa about hunters, dungeons and levelling up, in the
+    same vein as Solo Leveling.
+
+- question: manhwa about a weak hunter who becomes strong
+  group: recommend
+  answerable: true
+  expected_refs: ["series:105398", "series:128067", "series:141958"]
+  expected_route: catalogue
+  expected_filters:
+    country: KR
+  gist: Solo Leveling and similar hunter progression stories.
+
+- question: manga about titans attacking humanity
+  group: recommend
+  answerable: true
+  expected_refs: ["series:53390"]
+  expected_route: catalogue
+  expected_filters:
+    country: JP
+  gist: Attack on Titan, in which humanity shelters behind walls from titans.
+
+- question: series about climbing a mysterious tower
+  group: recommend
+  answerable: true
+  expected_refs: ["series:85143"]
+  expected_route: catalogue
+  gist: Tower of God, about climbing a tower that grants wishes at its summit.
+
+- question: pirate adventure manga
+  group: recommend
+  answerable: true
+  expected_refs: ["series:30013"]
+  expected_route: catalogue
+  expected_filters:
+    country: JP
+    genres: [Adventure]
+  gist: One Piece, about pirates searching for a legendary treasure.
+
+# -------------------------------------------------------------- industry Q&A
+# Ordinary document RAG with citations.
+
+- question: What is a webtoon and where did the format originate?
+  group: industry
+  answerable: true
+  expected_refs: ["article:Webtoon", "article:Webtoon_(platform)", "article:Manhwa"]
+  expected_route: industry
+  gist: >-
+    An episodic digital comic that originated in South Korea, designed for
+    vertical scrolling on smartphones.
+
+- question: How does the Webtoon platform make money?
+  group: industry
+  answerable: true
+  # "Naver Webtoon" redirects to "Webtoon (platform)" on Wikipedia, so it is not
+  # a separate document in the corpus.
+  expected_refs: ["article:Webtoon_(platform)", "article:Webtoon"]
+  expected_route: industry
+  gist: >-
+    Largely free-to-read with paid early access to episodes, plus advertising
+    and merchandising or adaptation revenue.
+
+- question: What is scanlation?
+  group: industry
+  answerable: true
+  expected_refs: ["article:Scanlation"]
+  expected_route: industry
+  gist: >-
+    Fan scanning, translation and distribution of comics without a licence,
+    which sits outside official publishing channels.
+
+- question: Which magazine publishes One Piece?
+  group: industry
+  answerable: true
+  expected_refs: ["article:Weekly_Shōnen_Jump", "article:Shueisha", "article:One_Piece"]
+  expected_route: industry
+  gist: Weekly Shōnen Jump, published by Shueisha.
+
+- question: What is the difference between shonen and seinen manga?
+  group: industry
+  answerable: true
+  expected_refs: ["article:Shōnen_manga", "article:Seinen_manga"]
+  expected_route: industry
+  # "manga" implies a Japanese origin filter. Correct extraction, and harmless
+  # here because the industry route does not apply catalogue filters.
+  expected_filters:
+    country: JP
+  gist: >-
+    Shōnen targets adolescent boys, seinen targets adult men, with
+    correspondingly more mature themes and presentation.
+
+- question: What is manhua and how does it differ from manhwa?
+  group: industry
+  answerable: true
+  expected_refs: ["article:Manhua", "article:Manhwa"]
+  expected_route: industry
+  # The query names two media words; the extractor takes the first. A known
+  # limitation, harmless on the industry route.
+  expected_filters:
+    country: KR
+  gist: >-
+    Manhua are Chinese comics and manhwa are Korean comics; they differ in
+    country of origin, language and publishing traditions.
+
+# --------------------------------------------------------------- unanswerable
+# Verified absent from both corpora. The correct behaviour is to decline.
+# These questions are plausible on purpose — a system that only refuses
+# obviously-silly questions has not demonstrated anything.
+
+- question: How much did the Solo Leveling anime adaptation gross at the box office?
+  group: unanswerable
+  answerable: false
+  expected_refs: []
+  expected_route: both
+  gist: Not covered — the corpus holds no box-office or revenue figures.
+
+- question: What is the home address of the author of Solo Leveling?
+  group: unanswerable
+  answerable: false
+  expected_refs: []
+  expected_route: both
+  gist: Not covered, and not something the corpus would ever contain.
+
+- question: Which manhwa will be released next month?
+  group: unanswerable
+  answerable: false
+  expected_refs: []
+  expected_route: both
+  expected_filters:
+    country: KR
+  gist: Not covered — the catalogue holds no forthcoming release schedule.
+
+- question: How do I set up a Kubernetes cluster?
+  group: unanswerable
+  answerable: false
+  expected_refs: []
+  expected_route: both
+  gist: Entirely outside the subject of this corpus.
+
+- question: What were Naver Webtoon's exact quarterly earnings in 2024?
+  group: unanswerable
+  answerable: false
+  expected_refs: []
+  expected_route: industry
+  gist: >-
+    Not covered — the articles describe the business qualitatively but contain
+    no quarterly financial figures.

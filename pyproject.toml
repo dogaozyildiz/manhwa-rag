@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "manhwa-rag"
+version = "0.1.0"
+description = "Manhwa/manga catalogue and industry assistant: hybrid retrieval over pgvector with self-verified citations"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy[asyncio]",
+    "psycopg[binary,pool]",
+    "alembic",
+    "pgvector",
+    # Embeddings run locally: no API key, no cost, and multilingual so Korean
+    # and Japanese titles embed sensibly alongside English.
+    "sentence-transformers",
+    # Generation. Sits behind app/answer/provider.py so it can be swapped.
+    "google-genai",
+    "tiktoken",
+    "tenacity",
+    "httpx",
+    "jinja2",
+    "python-multipart",  # FastAPI Form(...) for the HTMX endpoint
+    "pydantic-settings",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

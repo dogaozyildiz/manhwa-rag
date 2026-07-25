@@ -1,0 +1,107 @@
+{# Answer fragment.
+
+   Three things are shown that most RAG demos hide, because they are what make
+   the result trustworthy rather than merely plausible:
+     1. the structured filters that were actually applied,
+     2. the verbatim quote behind every claim,
+     3. the count of claims REJECTED by verification. #}
+<style>
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:1.2rem 1.35rem;margin-bottom:1rem}
+  .q{font-weight:600;margin:0 0 .8rem}
+  .badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.15rem .5rem;
+         border-radius:999px;background:var(--accent-bg);color:var(--accent);
+         text-transform:uppercase;letter-spacing:.04em;margin-right:.3rem}
+  .badge.warn{background:var(--warn-bg);color:var(--warn)}
+  .badge.plain{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .answer{margin-top:.85rem;white-space:pre-wrap}
+  h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+     margin:0 0 .7rem;font-weight:600}
+  ol.claims{margin:0;padding-left:1.2rem}
+  ol.claims li{margin-bottom:.9rem;font-size:.92rem}
+  blockquote{margin:.35rem 0;padding-left:.75rem;border-left:2px solid var(--accent);
+             color:var(--fg);font-size:.9rem}
+  a{color:var(--accent)}
+  .meta{font-size:.8rem;color:var(--muted)}
+  .series{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.3rem}
+  .chip{border:1px solid var(--line);border-radius:8px;padding:.45rem .65rem;
+        font-size:.82rem;background:var(--bg)}
+  .chip b{display:block;font-weight:600}
+</style>
+
+<div class="card">
+  <p class="q">{{ question }}</p>
+
+  <span class="badge plain">route: {{ answer.route }}</span>
+  {% if answer.applied_filters %}
+    <span class="badge">filters: {{ answer.applied_filters | join(' · ') }}</span>
+  {% endif %}
+  {% if answer.refused %}
+    <span class="badge warn">not in corpus</span>
+  {% else %}
+    <span class="badge">{{ answer.verified_claims | length }} verified citation{{ '' if answer.verified_claims|length == 1 else 's' }}</span>
+  {% endif %}
+  {% if answer.rejected_claims %}
+    <span class="badge warn">{{ answer.rejected_claims | length }} rejected</span>
+  {% endif %}
+
+  <div class="answer">{{ answer.text }}</div>
+</div>
+
+{% if answer.verified_claims %}
+<div class="card">
+  <h3>Citations — each quote verified present in its source</h3>
+  <ol class="claims">
+    {% for c in answer.verified_claims %}
+    <li>
+      {{ c.text }}
+      <blockquote>“{{ c.quote }}”</blockquote>
+      <span class="meta">{{ c.ref }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+
+{% if answer.rejected_claims %}
+<div class="card" style="border-left:3px solid var(--warn)">
+  <h3>Rejected by verification — quotes that could not be found</h3>
+  <ol class="claims">
+    {% for c in answer.rejected_claims %}
+    <li>
+      <blockquote>“{{ c.quote }}”</blockquote>
+      <span class="meta">{{ c.ref }} — {{ c.reason }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="meta">
+    These were removed from the answer above. Showing them makes the guarantee
+    visible rather than merely claimed.
+  </p>
+</div>
+{% endif %}
+
+{% set series = answer.sources | selectattr('kind','equalto','series') | list %}
+{% if series %}
+<div class="card">
+  <h3>Matched series</h3>
+  <div class="series">
+    {% for s in series %}
+    <div class="chip">
+      <b>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</b>
+      <span class="meta">
+        {{ s.meta.country }}
+        {%- if s.meta.status %} · {{ s.meta.status|lower }}{% endif %}
+        {%- if s.meta.chapters %} · {{ s.meta.chapters }} ch{% endif %}
+        {%- if s.meta.start_year %} · {{ s.meta.start_year }}{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<p class="meta">
+  {{ answer.sources | length }} sources · {{ answer.latency_ms }} ms · {{ answer.model }}
+  {%- if answer.usage %} · {{ answer.usage.get('input_tokens', 0) }} in / {{ answer.usage.get('output_tokens', 0) }} out tokens{% endif %}
+</p>
