@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 from app import api
 from app.answer.schema import Answer, Claim
 from app.api import app
-from tests.conftest import requires_db
+from tests.conftest import SEEDED_MATCHING_IDS, requires_db
 
 
 @pytest.fixture
@@ -90,9 +90,13 @@ class TestHealthAndRetrieve:
         assert isinstance(body["chunks"], int)
 
     @requires_db
-    def test_retrieve_needs_no_api_key(self, client):
-        """The retrieval endpoint must stay usable without a provider key —
-        it is the fallback when a free-tier quota is exhausted."""
+    def test_retrieve_extracts_filters_without_an_api_key(self, client):
+        """The retrieval endpoint must stay usable without a provider key — it
+        is the fallback when a free-tier quota is exhausted.
+
+        Note this query has no semantic remainder, so it never touches the
+        embedding model: pure-filter retrieval runs on SQL and trigram alone.
+        """
         resp = client.post(
             "/retrieve", json={"question": "completed romance manhwa under 100 chapters"}
         )
@@ -101,14 +105,32 @@ class TestHealthAndRetrieve:
         assert body["route"] == "catalogue"
         assert "Korean" in body["applied_filters"]
         assert "<100 chapters" in body["applied_filters"]
-        assert body["sources"]
 
     @requires_db
-    def test_retrieve_applies_filters_to_every_result(self, client):
-        """The headline guarantee, asserted rather than eyeballed."""
+    async def test_retrieve_applies_every_filter_predicate(
+        self, client, seeded_catalogue
+    ):
+        """The headline guarantee, asserted against a known corpus.
+
+        Seeded rather than relying on the ingested corpus, because CI runs
+        migrations but never ingests — and a reachable-but-empty database made
+        the previous version of this test pass while checking nothing.
+        """
         resp = client.post(
-            "/retrieve", json={"question": "completed romance manhwa under 100 chapters"}
+            "/retrieve",
+            json={"question": "completed romance manhwa under 100 chapters", "k": 20},
         )
+        assert resp.status_code == 200
+
+        returned = {
+            s["meta"]["anilist_id"]
+            for s in resp.json()["sources"]
+            if s["kind"] == "series" and s["meta"]["anilist_id"] in set(seeded_catalogue)
+        }
+        # Exactly the two fixture rows that satisfy every predicate. The other
+        # four each break one, so a filter that fails to bind adds a row here.
+        assert returned == SEEDED_MATCHING_IDS
+
         for source in resp.json()["sources"]:
             if source["kind"] != "series":
                 continue
