@@ -73,8 +73,12 @@ project
 > generates the answer.
 >
 > Measured on a 30-question golden set: recall@5 0.957, recall@10 1.000, filter
-> extraction precision 0.941 / recall 1.000. The README documents which change
-> moved which number.
+> extraction precision 0.941 / recall 1.000. On the generation tier, 94.7% of
+> quoted citations were verbatim in the source they named, all five unanswerable
+> questions were declined, and no answerable question was wrongly refused —
+> measured on an 8B model with three sources per question, so a larger model
+> would be expected to do better. The README documents which change moved which
+> number.
 >
 > Stack: Python, FastAPI, PostgreSQL + pgvector, SQLAlchemy 2.0 async, Alembic,
 > sentence-transformers, Docker, GitHub Actions.
@@ -105,7 +109,11 @@ On evaluation:
 On refusals (usually the thing clients actually worry about):
 
 > The system declines when the answer isn't in the corpus. That sounds minor
-> until you've seen a support bot invent a refund policy.
+> until you've seen a support bot invent a refund policy. I measure it rather
+> than assert it: five deliberately unanswerable questions in the golden set,
+> all five declined, and no answerable question refused by mistake. Both
+> directions matter — a system that refuses everything would score perfectly on
+> the first half.
 
 ---
 

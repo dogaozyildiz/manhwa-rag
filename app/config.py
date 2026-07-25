@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     # quotas up front, so it is a rate-limit parameter as much as a length one.
     max_output_tokens: int = 1200
 
+    # Load the embedding model when the server boots rather than on the first
+    # question. Importing torch and loading the model costs ~80s on a cold
+    # process; paid lazily, that lands on whoever asks first, and an 80-second
+    # question looks like a hung app rather than a warming one. Off for tests,
+    # which stub the embedder and must not pay for torch.
+    warm_embedder: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

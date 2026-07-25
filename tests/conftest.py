@@ -1,4 +1,11 @@
 import asyncio
+import os
+
+# Set before any app import, because `get_settings()` is cached on first call.
+# The suite stubs the embedder, so warming would load a 470MB model and import
+# torch — ~80s — for no benefit. `TestClient(app)` without a context manager
+# does not run lifespan today, but this must not become load-bearing.
+os.environ.setdefault("WARM_EMBEDDER", "false")
 
 import pytest
 from sqlalchemy import text

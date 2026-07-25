@@ -13,8 +13,18 @@ a demo:
    covered", not an invented answer.
 
 Nothing here costs money to run. Embeddings are computed locally; the only
-account needed is a free Google AI Studio key for generation, and retrieval
-works without even that.
+account needed is a free Groq key for generation, and retrieval works without
+even that. (Google AI Studio was the original choice, but its free tier grants a
+zero quota in the EEA — see `app/answer/gemini.py`.)
+
+![A cited answer](docs/demo-answer.png)
+
+Every quote above was checked against the source text before it was displayed.
+Below, the same system declining a question the corpus cannot answer — while
+still showing what it *did* match, so the refusal is transparent rather than a
+dead end:
+
+![A correct refusal](docs/demo-refusal.png)
 
 ---
 
@@ -138,6 +148,14 @@ pytest -q
 in `.env` as `GROQ_API_KEY=...`. Retrieval, filter extraction, routing and the
 whole eval's retrieval tier work without it — `POST /retrieve` returns matched
 sources, applied filters and the chosen route with no key at all.
+
+**The server takes ~60–90s to become ready**, spent importing torch and loading
+the embedding model. That cost is paid at startup, deliberately: loading lazily
+put it on whoever asked the first question, and a question that takes 80 seconds
+reads as a hung app rather than a warming one. `Application startup complete`
+means it is genuinely ready — answers land in 2–4s from then on. Set
+`WARM_EMBEDDER=false` to restore lazy loading (the test suite does this, since it
+stubs the embedder and should never import torch).
 
 ### Choosing a provider
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
@@ -10,12 +12,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.answer.pipeline import answer_question, retrieve
 from app.answer.provider import ProviderError
+from app.config import get_settings
 from app.db import get_session
+from app.ingest.embedder import get_embedder
 from app.retrieval.catalogue import CatalogueRetriever
 from app.retrieval.documents import DocumentRetriever
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Pay the embedding model's load cost at boot, not on the first question.
+
+    `Embedder._load()` stays lazy on purpose — tests and `/health` should never
+    import torch. But in a serving process that laziness only defers the cost
+    onto the first real user, who then waits ~80 seconds (61s to import
+    sentence-transformers, 19s to load the model) with no indication anything is
+    happening. Warming here converts that into startup time, which is visible in
+    the log and expected of a server.
+
+    `embed_query` offloads to a thread, so this does not block the event loop,
+    and a failure here is fatal by design: a server that cannot embed cannot
+    retrieve, and should say so at boot rather than at request time.
+    """
+    if get_settings().warm_embedder:
+        started = time.perf_counter()
+        await get_embedder().embed_query("warmup")
+        print(f"embedder warm in {time.perf_counter() - started:.1f}s")
+    yield
+
 
 app = FastAPI(
     title="Manhwa RAG",
@@ -24,6 +51,7 @@ app = FastAPI(
         "with structured filters and citations verified against source text."
     ),
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 
