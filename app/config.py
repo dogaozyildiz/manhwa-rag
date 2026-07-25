@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     top_k: int = 5
     candidate_k: int = 20
 
+    # Per-source character cap applied before generation. Free-tier providers
+    # enforce hard per-request token ceilings (Groq's 8B model: 6000 TPM), and a
+    # `both` route returns 2*k sources, so untruncated chunks overflow it with a
+    # 413 that retrying cannot fix.
+    max_source_chars: int = 1200
+
+    # Completion tokens requested. Providers reserve this against per-minute
+    # quotas up front, so it is a rate-limit parameter as much as a length one.
+    max_output_tokens: int = 1200
+
 
 @lru_cache
 def get_settings() -> Settings:

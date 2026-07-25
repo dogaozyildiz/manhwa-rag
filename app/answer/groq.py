@@ -66,7 +66,12 @@ class GroqProvider:
             # quotes closer to verbatim, which directly raises the share that
             # survives verification.
             "temperature": 0.1,
-            "max_tokens": 4096,
+            # Reserved completion tokens count against the per-minute budget
+            # BEFORE generation, so an oversized value fails the request outright.
+            # Measured: a k=3 prompt is ~1900 tokens, and 1900 + 4096 = 5996
+            # against Groq's 6000 TPM free-tier limit — the reservation, not the
+            # prompt, was causing 413s. Answers here are short by design.
+            "max_tokens": get_settings().max_output_tokens,
         }
         headers = {
             "Authorization": f"Bearer {self._api_key}",

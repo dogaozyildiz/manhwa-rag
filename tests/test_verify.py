@@ -139,3 +139,36 @@ def test_verify_claims_preserves_order_and_marks_each():
 def test_normalise_is_idempotent():
     text = "  The  publisher’s   2019–2020 revenue.  "
     assert normalise(normalise(text)) == normalise(text)
+
+
+def test_ref_missing_its_prefix_still_resolves():
+    """Models routinely drop the `article:` prefix. That is a format slip, not a
+    dishonest one, and must not be counted as a grounding failure."""
+    result = verify_claim(
+        Claim(text="t", quote="originated in South Korea", ref="Webtoon"),
+        {s.ref: s for s in SOURCES},
+    )
+    assert result.verified is True
+    # The canonical ref is restored so downstream consumers can resolve it.
+    assert result.ref == "article:Webtoon"
+
+
+def test_prefixless_ref_still_requires_a_verbatim_quote():
+    """Loosening ref matching must not loosen the evidence requirement."""
+    result = verify_claim(
+        Claim(text="t", quote="a completely invented sentence here", ref="Webtoon"),
+        {s.ref: s for s in SOURCES},
+    )
+    assert result.verified is False
+
+
+def test_ambiguous_bare_ref_is_not_guessed():
+    """If a bare ref matches more than one source, resolving it would be a
+    guess — exactly what this module exists to avoid."""
+    a = Source(ref="article:X", kind="article", title="X", text="alpha text", score=1.0)
+    b = Source(ref="series:X", kind="series", title="X", text="alpha text", score=1.0)
+    result = verify_claim(
+        Claim(text="t", quote="alpha text here", ref="X"), {a.ref: a, b.ref: b}
+    )
+    assert result.verified is False
+    assert "unknown source" in result.reason

@@ -122,7 +122,9 @@ def score_filters(item: dict, result: QuestionResult) -> None:
             result.filter_errors.append(f"-{field_name}={sorted(want_set - got_set)}")
 
 
-async def run(*, with_answers: bool, k: int) -> tuple[list[QuestionResult], dict]:
+async def run(
+    *, with_answers: bool, k: int, delay: float = 0.0
+) -> tuple[list[QuestionResult], dict]:
     items = load_golden()
     results: list[QuestionResult] = []
 
@@ -149,6 +151,12 @@ async def run(*, with_answers: bool, k: int) -> tuple[list[QuestionResult], dict
 
             # --- answer tier (needs a provider key) ---
             if with_answers:
+                # Free-tier providers meter tokens per *minute*, as a rolling
+                # budget across requests — not per request. Shrinking each
+                # prompt therefore cannot prevent a 413 on its own; the calls
+                # have to be spaced so the window drains between them.
+                if delay and results:
+                    await asyncio.sleep(delay)
                 answer = await answer_question(session, item["question"], k=k)
                 result.answer = answer.text
                 result.refused = answer.refused
@@ -299,10 +307,17 @@ def main() -> None:
     parser.add_argument("--with-answers", action="store_true",
                         help="also run the generation tier (needs GOOGLE_API_KEY)")
     parser.add_argument("--label", default=None)
+    parser.add_argument(
+        "--delay", type=float, default=0.0,
+        help="seconds between answer calls; needed on free tiers that meter "
+             "tokens per minute as a rolling budget",
+    )
     args = parser.parse_args()
 
     label = args.label or ("full" if args.with_answers else "retrieval")
-    results, summary = asyncio.run(run(with_answers=args.with_answers, k=args.k))
+    results, summary = asyncio.run(
+        run(with_answers=args.with_answers, k=args.k, delay=args.delay)
+    )
     path = write_report(results, summary, label)
     print("\n" + json.dumps(summary, indent=2))
     print(f"\nreport: {path}")

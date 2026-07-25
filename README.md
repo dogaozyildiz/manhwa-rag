@@ -69,6 +69,31 @@ recommendations, 6 industry questions, 5 deliberately unanswerable.
 | industry | 6 | 1.000 | 0.833 |
 | recommend | 5 | 0.800 | 0.595 |
 
+### Answer quality
+
+Measured on `llama-3.1-8b-instant` with k=3 and sources truncated to 1200
+characters — all three forced by free-tier limits. A larger model with more
+sources would be expected to score higher, so treat these as a floor.
+
+| metric | value |
+|---|---|
+| citation groundedness | **0.947** (54/57 quotes verbatim) |
+| refusal accuracy on unanswerable questions | **5/5** |
+| false refusals on answerable questions | **0** |
+| median latency | 8.5 s |
+
+The three rejected citations are all correct rejections: two quotes too short to
+count as evidence, and one that appears in no retrieved source — a fabrication
+caught and discarded before it could be shown as a citation.
+
+An earlier run scored 0.830. The gap was mostly *format*, not dishonesty: the
+model named the right source but dropped the `article:` prefix, so five
+otherwise-verbatim quotes were rejected as citing an unknown source. Two changes
+closed it — conservative ref resolution in `verify.py` (a bare ref resolves only
+if it matches exactly one retrieved source, and the quote must still appear
+verbatim) and an explicit prompt rule to copy refs exactly. Both changed
+together, so neither can claim the gain alone.
+
 ### How it got there
 
 Each change was made because a number moved, not because it seemed like a good

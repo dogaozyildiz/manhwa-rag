@@ -90,16 +90,56 @@ async def retrieve(
     return merged, filters.describe(), route
 
 
+def truncate_sources(sources: list[Source], max_chars: int) -> list[Source]:
+    """Cap each source's text before it reaches the model.
+
+    Two reasons, one practical and one qualitative:
+
+    * Free-tier providers enforce hard per-request token ceilings — Groq's
+      8B model allows 6000 TPM, and six untruncated sources exceed it with a
+      413 that no retry can fix.
+    * A very long chunk dilutes the prompt regardless of limits; the answer is
+      almost always in its opening lines.
+
+    Critically this truncates the `Source` itself, not just the prompt text, so
+    the verifier checks quotes against exactly what the model was shown. If the
+    two diverged, a model could quote text it never received and still pass
+    verification against the untruncated original.
+    """
+    out: list[Source] = []
+    for source in sources:
+        if len(source.text) <= max_chars:
+            out.append(source)
+            continue
+        out.append(
+            Source(
+                ref=source.ref,
+                kind=source.kind,
+                title=source.title,
+                text=source.text[:max_chars].rstrip(),
+                score=source.score,
+                url=source.url,
+                origin=source.origin,
+                meta=source.meta,
+            )
+        )
+    return out
+
+
 async def answer_question(
     session: AsyncSession,
     question: str,
     *,
     provider: LLMProvider | None = None,
     k: int | None = None,
+    max_source_chars: int | None = None,
 ) -> Answer:
     started = time.perf_counter()
     sources, applied_filters, route = await retrieve(session, question, k=k)
     provider = provider or get_provider()
+    sources = truncate_sources(
+        sources, max_source_chars or get_settings().max_source_chars
+    )
 
     if not sources:
         # Nothing retrieved at all — refuse without spending a model call.

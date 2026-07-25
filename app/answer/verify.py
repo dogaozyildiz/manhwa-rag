@@ -46,6 +46,33 @@ def normalise(text: str) -> str:
     return _WS.sub(" ", folded).strip().lower()
 
 
+def resolve_ref(ref: str, sources_by_ref: dict[str, Source]) -> str | None:
+    """Match a model-supplied ref to a retrieved source, tolerating format slips.
+
+    Models routinely drop the `article:`/`series:` prefix — returning
+    `Webtoon_(platform)#9` for `article:Webtoon_(platform)#9`. That is a
+    formatting error, not a dishonest one: the source named is unambiguous and
+    the quote may well be verbatim. Rejecting it would count a format slip as a
+    grounding failure and understate how faithful the model actually was.
+
+    Resolution is deliberately conservative — a bare suffix is accepted only if
+    it matches **exactly one** retrieved source. An ambiguous ref stays
+    unresolved, because guessing which source a claim meant is precisely the
+    kind of inference this module exists to avoid. The quote must still appear
+    verbatim in whatever it resolves to; this loosens ref *matching*, never the
+    evidence requirement.
+    """
+    if ref in sources_by_ref:
+        return ref
+
+    candidates = [
+        known
+        for known in sources_by_ref
+        if known.split(":", 1)[-1] == ref or known.endswith(f":{ref}")
+    ]
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def verify_claim(claim: Claim, sources_by_ref: dict[str, Source]) -> Claim:
     """Return the claim with `verified` set, and a reason when it is not."""
     quote = (claim.quote or "").strip()
@@ -56,18 +83,21 @@ def verify_claim(claim: Claim, sources_by_ref: dict[str, Source]) -> Claim:
             verified=False, reason="quote too short to be evidence",
         )
 
-    source = sources_by_ref.get(claim.ref)
-    if source is None:
-        # The model named a source that was never retrieved — a fabricated
-        # attribution, and the most dangerous failure mode of the three.
+    resolved = resolve_ref(claim.ref, sources_by_ref)
+    if resolved is None:
+        # The model named a source that was never retrieved, or one too
+        # ambiguous to identify — a fabricated attribution, and the most
+        # dangerous failure mode of the three.
         return Claim(
             text=claim.text, quote=claim.quote, ref=claim.ref,
             verified=False, reason=f"cites unknown source {claim.ref!r}",
         )
 
+    source = sources_by_ref[resolved]
     if normalise(quote) in normalise(source.text):
+        # Store the canonical ref so downstream consumers get a resolvable id.
         return Claim(
-            text=claim.text, quote=quote, ref=claim.ref, verified=True
+            text=claim.text, quote=quote, ref=resolved, verified=True
         )
 
     # Distinguish "quoted the wrong source" from "invented the quote". Both are
