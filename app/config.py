@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # prose. Red-team runs showed refused=true answers that still asserted the
     # planted falsehood in full.
     strict_refusals: bool = True
+    # T6: access control and consumption limits (app/security.py).
+    # Empty API_KEY = open API, allowed only on 127.0.0.1 (scripts/serve.py).
+    api_key: str = ""
+    rate_limit_per_minute: int = 10
+    llm_daily_budget: int = 300
 
     # Load the embedding model when the server boots rather than on the first
     # question. Importing torch and loading the model costs ~80s on a cold
