@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # is a flag so before/after runs are reproducible without switching branches.
     # M2: sources wrapped in delimiters and declared untrusted in the prompt.
     harden_prompt: bool = True
+    # M1: remove links/emails not on the allowlist from model output.
+    filter_output_links: bool = True
+    link_allowlist: list[str] = ["wikipedia.org", "anilist.co"]
 
     # Load the embedding model when the server boots rather than on the first
     # question. Importing torch and loading the model costs ~80s on a cold

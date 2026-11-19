@@ -9,6 +9,7 @@ reaches a user, and counted so the eval can report how often it happens.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,7 @@ from app.answer.prompt import (
     format_sources_hardened,
 )
 from app.answer.provider import LLMProvider, get_provider
+from app.answer.output_filter import filter_output
 from app.answer.schema import Answer, Claim
 from app.answer.verify import verify_claims
 from app.config import get_settings
@@ -29,6 +31,8 @@ from app.retrieval.documents import DocumentRetriever
 from app.retrieval.filters import extract_filters, strip_filter_terms
 from app.retrieval.router import route_query
 from app.retrieval.store import Source
+
+log = logging.getLogger(__name__)
 
 ANSWER_SCHEMA = {
     "type": "object",
@@ -182,6 +186,17 @@ async def answer_question(
     ]
     claims = verify_claims(raw_claims, sources)
 
+    answer_text = str(payload.get("answer", "")).strip()
+    settings = get_settings()
+    if settings.filter_output_links:
+        # After verification on purpose: a quote can be verbatim AND malicious
+        # when the source itself is poisoned.
+        answer_text, claims, removed = filter_output(
+            answer_text, claims, settings.link_allowlist
+        )
+        if removed:
+            log.warning("output filter removed untrusted links: %s", removed)
+
     model_refused = bool(payload.get("refused"))
     # A non-refusal whose every claim failed verification is not an answer we
     # can stand behind, so it is reported as a refusal rather than shown as
@@ -189,7 +204,7 @@ async def answer_question(
     unsupported = bool(raw_claims) and not any(c.verified for c in claims)
 
     return Answer(
-        text=str(payload.get("answer", "")).strip(),
+        text=answer_text,
         claims=claims,
         sources=[
             {

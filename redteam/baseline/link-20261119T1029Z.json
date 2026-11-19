@@ -1,6 +1,5 @@
 {
   "payload": "link",
-  "asr": 0.7777777777777778,
   "hits": 7,
   "valid_runs": 9,
   "rows": [
@@ -1340,5 +1339,8 @@
         "model": "groq"
       }
     }
-  ]
+  ],
+  "blocked_hits": 0,
+  "delivered_asr": 0.7777777777777778,
+  "model_asr": 0.7777777777777778
 }
