@@ -88,3 +88,22 @@ class TestPrimitives:
         assert b.take(1) and not b.take(1)
         day[0] = date(2026, 11, 20)
         assert b.take(1)
+
+
+class TestFailClosedStartup:
+    """The container starts uvicorn directly; startup itself must refuse an open API."""
+
+    def test_startup_fails_without_key_when_required(self, settings, monkeypatch):
+        monkeypatch.setattr(settings, "require_api_key", True)
+        monkeypatch.setattr(settings, "api_key", "")
+        monkeypatch.setattr(settings, "warm_embedder", False)
+        with pytest.raises(RuntimeError, match="API_KEY"):
+            with TestClient(api.app):
+                pass
+
+    def test_startup_ok_with_key(self, settings, monkeypatch):
+        monkeypatch.setattr(settings, "require_api_key", True)
+        monkeypatch.setattr(settings, "api_key", "s3cret")
+        monkeypatch.setattr(settings, "warm_embedder", False)
+        with TestClient(api.app) as c:
+            assert c.post("/ask", json={"question": "hi"}).status_code == 401

@@ -38,7 +38,15 @@ async def lifespan(_: FastAPI):
     and a failure here is fatal by design: a server that cannot embed cannot
     retrieve, and should say so at boot rather than at request time.
     """
-    if get_settings().warm_embedder:
+    settings = get_settings()
+    if settings.require_api_key and not settings.api_key:
+        # T6: the Dockerfile starts uvicorn directly on 0.0.0.0, bypassing the
+        # host check in scripts/serve.py. This check runs however it starts.
+        raise RuntimeError(
+            "REQUIRE_API_KEY is set but API_KEY is empty: refusing to serve an "
+            "open API. Set API_KEY in the deployment environment."
+        )
+    if settings.warm_embedder:
         started = time.perf_counter()
         await get_embedder().embed_query("warmup")
         print(f"embedder warm in {time.perf_counter() - started:.1f}s")

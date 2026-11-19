@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     # T6: access control and consumption limits (app/security.py).
     # Empty API_KEY = open API, allowed only on 127.0.0.1 (scripts/serve.py).
     api_key: str = ""
+    # Set to true in every deployment image (Dockerfile). Startup then fails
+    # unless API_KEY is set, whatever command or host the platform uses.
+    require_api_key: bool = False
     rate_limit_per_minute: int = 10
     llm_daily_budget: int = 300
 
