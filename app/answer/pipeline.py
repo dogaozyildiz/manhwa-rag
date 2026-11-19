@@ -13,7 +13,13 @@ import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.answer.prompt import SYSTEM, build_user_prompt, format_sources
+from app.answer.prompt import (
+    SYSTEM,
+    SYSTEM_HARDENED,
+    build_user_prompt,
+    format_sources,
+    format_sources_hardened,
+)
 from app.answer.provider import LLMProvider, get_provider
 from app.answer.schema import Answer, Claim
 from app.answer.verify import verify_claims
@@ -155,9 +161,14 @@ async def answer_question(
             route=route,
         )
 
+    if get_settings().harden_prompt:
+        system, sources_block = SYSTEM_HARDENED, format_sources_hardened(sources)
+    else:
+        system, sources_block = SYSTEM, format_sources(sources)
+
     payload, usage = await provider.complete_json(
-        SYSTEM,
-        build_user_prompt(question, format_sources(sources)),
+        system,
+        build_user_prompt(question, sources_block),
         ANSWER_SCHEMA,
     )
 

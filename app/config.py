@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     # quotas up front, so it is a rate-limit parameter as much as a length one.
     max_output_tokens: int = 1200
 
+    # Security hardening (see docs/THREAT_MODEL.md, redteam/). Each mitigation
+    # is a flag so before/after runs are reproducible without switching branches.
+    # M2: sources wrapped in delimiters and declared untrusted in the prompt.
+    harden_prompt: bool = True
+
     # Load the embedding model when the server boots rather than on the first
     # question. Importing torch and loading the model costs ~80s on a cold
     # process; paid lazily, that lands on whoever asks first, and an 80-second
