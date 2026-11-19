@@ -1,6 +1,6 @@
 # Threat Model — manhwa-rag + manga-chatbot
 
-Status: baseline (before hardening). Date: 2026-11-19.
+Status: baseline (before hardening). Date: 2026-11-19. Results: `redteam/BASELINE_RESULTS.md`.
 Scope: `manhwa-rag` (retrieval + generation API) and `manga-chatbot` (Telegram /
 Discord / WhatsApp channel layer over it), run locally.
 
@@ -60,9 +60,9 @@ editable by anyone on the internet and re-pulled live on every ingest,
 
 | ID | OWASP | Threat | Asset | Current control | Test | Status |
 |----|-------|--------|-------|-----------------|------|--------|
-| T1 | LLM01 | **Indirect prompt injection** via a poisoned Wikipedia/AniList text: instructions inside a source steer the answer | A1 | None specific. Sources are concatenated into the prompt with no marking as untrusted data | `redteam/poison.py` payloads `link`, `hijack` | Hypothesis |
-| T2 | LLM05 | **Unverified `answer` field.** Verifier checks `claims` only; `answer` text is returned as-is, next to verified citations that lend it credibility. Injected links/text reach the user | A1 | Markup escaping only (stops HTML, not content) | Payload `link` | Confirmed in code, impact untested |
-| T3 | LLM04 / LLM09 | **Verified falsehood.** A false statement planted in a source passes verification, because the verifier checks presence of the quote, not truth | A1 | None — verifier is a grounding control, not a truth control | Payload `false` | Hypothesis |
+| T1 | LLM01 | **Indirect prompt injection** via a poisoned Wikipedia/AniList text: instructions inside a source steer the answer | A1 | None specific. Sources are concatenated into the prompt with no marking as untrusted data | `redteam/poison.py` payloads `link`, `hijack` | **Confirmed**: 78% (link), 2/6 model compliance (hijack) |
+| T2 | LLM05 | **Unverified `answer` field.** Verifier checks `claims` only; `answer` text is returned as-is, next to verified citations that lend it credibility. Injected links/text reach the user | A1 | Markup escaping only (stops HTML, not content) | Payload `link` | **Confirmed**: 7/7 delivered injections were in `answer` |
+| T3 | LLM04 / LLM09 | **Verified falsehood.** A false statement planted in a source passes verification, because the verifier checks presence of the quote, not truth | A1 | None — verifier is a grounding control, not a truth control | Payload `false` | **Confirmed**: 9/9 verified falsehoods |
 | T4 | LLM01 | Direct prompt injection / off-topic hijacking via the question | A1, A2 | System prompt scope, refusal, 1000-char limit | promptfoo `hijacking` + strategies | Untested |
 | T5 | LLM09 | Hallucination / overreliance on false premises in the question | A1 | Verifier + refusal | promptfoo `hallucination`, `overreliance` | Untested |
 | T6 | LLM10 | **Unbounded consumption.** manhwa-rag has no auth and no rate limit; chatbot limiter is per-process | A2 | localhost bind, input bounds | Code review; load test later | Confirmed in code (risk only if exposed) |

@@ -1,6 +1,6 @@
 # promptfoo red-team config for manhwa-rag  (baseline, before hardening)
 # Run from the manhwa-rag folder, with the server running:
-#   npx promptfoo@latest redteam run -c redteam/promptfooconfig.yaml --max-concurrency 1 --delay 4000
+#   npx promptfoo@latest redteam run -c redteam/promptfooconfig.yaml --max-concurrency 1 --delay 25000
 # Threat-model mapping: hijacking -> T4, hallucination/overreliance -> T5.
 
 description: manhwa-rag baseline red team
