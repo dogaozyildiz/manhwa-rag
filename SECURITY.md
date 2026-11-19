@@ -61,6 +61,7 @@ Full table and raw responses: [`redteam/RESULTS.md`](redteam/RESULTS.md),
 | T7 | WhatsApp webhook accepted unsigned POSTs (spoof any user, e.g. `/stop` deletes their data) | HMAC-SHA256 check of `X-Hub-Signature-256` on the raw body; webhook disabled without an app secret | manga-chatbot `TestSignature` (6 tests) |
 | T8 | Postgres published on all interfaces with a default password | Bound to `127.0.0.1`; password from env | `docker-compose.yml` |
 | T9 | Unpinned dependencies; **20 known CVEs** in the bot (aiohttp, certifi, multidict) | Lock files in both repos; vulnerable packages upgraded | `pip-audit`: 0 findings |
+| T6 | Container image started uvicorn on `0.0.0.0` directly, bypassing the API-key host check; both images ran as root | Startup itself fails without `API_KEY` when `REQUIRE_API_KEY=true` (set in the image); non-root user; `.dockerignore` keeps `.env`/`.git` out of images | `TestFailClosedStartup`; `Dockerfile` |
 | -- | Nothing stopped regressions | CI security job in both repos: `pip-audit`, `bandit`, `gitleaks` (full history), weekly scheduled run | `.github/workflows/ci.yml` |
 
 ## What is NOT fixed (residual risk)
@@ -76,6 +77,9 @@ Full table and raw responses: [`redteam/RESULTS.md`](redteam/RESULTS.md),
 4. **Rate limits are per process.** A multi-instance deployment needs a shared
    store (e.g. Redis).
 5. **Regression of normal answers is not yet measured** for M1/M2 (pending eval).
+6. **Images install the newest dependency versions**, not the audited lock files:
+   the lock files were generated on Windows/Python 3.14, the images run
+   Linux/Python 3.13. Fix: generate the lock inside the build image.
 
 ## Reproduce
 
