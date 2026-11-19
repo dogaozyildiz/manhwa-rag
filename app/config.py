@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # M1: remove links/emails not on the allowlist from model output.
     filter_output_links: bool = True
     link_allowlist: list[str] = ["wikipedia.org", "anilist.co"]
+    # When an answer is a refusal, show a fixed message instead of the model's
+    # prose. Red-team runs showed refused=true answers that still asserted the
+    # planted falsehood in full.
+    strict_refusals: bool = True
 
     # Load the embedding model when the server boots rather than on the first
     # question. Importing torch and loading the model costs ~80s on a cold

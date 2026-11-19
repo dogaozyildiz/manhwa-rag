@@ -34,6 +34,25 @@ from app.retrieval.store import Source
 
 log = logging.getLogger(__name__)
 
+REFUSAL_TEXT = (
+    "I can't give a verified answer to that from the catalogue or the "
+    "industry articles."
+)
+
+
+def apply_refusal_policy(answer_text: str, refused: bool, *, strict: bool) -> str:
+    """A refusal must not carry unverified assertions.
+
+    Baseline red-team (redteam/RESULTS.md, payload `false`): the model set
+    refused=true and in the same response wrote "Yes. In 2024 South Korea
+    amended its Copyright Act..." -- a planted falsehood. Any client that shows
+    `answer` regardless of `refused` displayed it. With `strict`, a refusal is
+    shown as a fixed sentence; nothing the model wrote reaches the user.
+    """
+    if refused and strict:
+        return REFUSAL_TEXT
+    return answer_text
+
 ANSWER_SCHEMA = {
     "type": "object",
     "properties": {
@@ -204,7 +223,9 @@ async def answer_question(
     unsupported = bool(raw_claims) and not any(c.verified for c in claims)
 
     return Answer(
-        text=answer_text,
+        text=apply_refusal_policy(
+            answer_text, model_refused or unsupported, strict=settings.strict_refusals
+        ),
         claims=claims,
         sources=[
             {
