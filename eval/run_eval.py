@@ -28,6 +28,7 @@ from pathlib import Path
 import yaml
 
 from app.answer.pipeline import answer_question, retrieve
+from app.answer.provider import ProviderError
 from app.db import session_scope
 from app.retrieval.filters import extract_filters
 from app.retrieval.router import route_query
@@ -67,6 +68,7 @@ class QuestionResult:
     n_verified: int = 0
     rejected: list[str] = field(default_factory=list)
     latency_ms: int | None = None
+    provider_error: str | None = None
 
 
 def load_golden() -> list[dict]:
@@ -157,16 +159,24 @@ async def run(
                 # have to be spaced so the window drains between them.
                 if delay and results:
                     await asyncio.sleep(delay)
-                answer = await answer_question(session, item["question"], k=k)
-                result.answer = answer.text
-                result.refused = answer.refused
-                result.refusal_correct = answer.refused == (not item["answerable"])
-                result.n_claims = len(answer.claims)
-                result.n_verified = len(answer.verified_claims)
-                result.rejected = [
-                    f"{c.ref}: {c.reason}" for c in answer.rejected_claims
-                ]
-                result.latency_ms = answer.latency_ms
+                try:
+                    answer = await answer_question(session, item["question"], k=k)
+                except ProviderError as exc:
+                    # One failed call must not discard the whole run. The
+                    # question is recorded as an error and excluded from the
+                    # answer metrics; the count is reported in the summary.
+                    result.provider_error = str(exc)[:300]
+                    print(f"    PROVIDER ERROR: {result.provider_error[:120]}")
+                else:
+                    result.answer = answer.text
+                    result.refused = answer.refused
+                    result.refusal_correct = answer.refused == (not item["answerable"])
+                    result.n_claims = len(answer.claims)
+                    result.n_verified = len(answer.verified_claims)
+                    result.rejected = [
+                        f"{c.ref}: {c.reason}" for c in answer.rejected_claims
+                    ]
+                    result.latency_ms = answer.latency_ms
 
             results.append(result)
             flag = "" if result.hit_at_5 or not result.expected_refs else "  MISS"
@@ -218,6 +228,8 @@ def summarise(results: list[QuestionResult], k: int, with_answers: bool) -> dict
             "refusal_accuracy": f"{sum(bool(r.refusal_correct) for r in unanswerable)}/{len(unanswerable)}",
             "false_refusals": sum(1 for r in answerable if r.refused),
             "median_latency_ms": int(statistics.median([r.latency_ms for r in answered if r.latency_ms])) if answered else None,
+            # Questions whose generation call failed; excluded from the metrics above.
+            "provider_errors": sum(1 for r in results if r.provider_error),
         }
     return summary
 
@@ -270,6 +282,7 @@ def write_report(results: list[QuestionResult], summary: dict, label: str) -> Pa
             f"| refusal accuracy (unanswerable) | {summary['refusal_accuracy']} |",
             f"| false refusals (answerable) | {summary['false_refusals']} |",
             f"| median latency | {summary['median_latency_ms']} ms |",
+            f"| provider errors (excluded) | {summary.get('provider_errors', 0)} |",
             "",
         ]
 

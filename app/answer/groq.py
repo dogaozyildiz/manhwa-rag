@@ -101,6 +101,24 @@ class GroqProvider:
                     await asyncio.sleep(wait)
                     continue
 
+                if (
+                    resp.status_code == 400
+                    and "json_validate_failed" in resp.text
+                    and '"failed_generation":""' in resp.text.replace(" ", "")
+                ):
+                    # gpt-oss is a reasoning model: occasionally its hidden
+                    # reasoning uses the whole output budget and it emits nothing,
+                    # which JSON mode then rejects. That is a transient sampling
+                    # failure, so it is retried. A NON-empty failed generation
+                    # (e.g. the model obeyed an injection and wrote plain text) is
+                    # deliberately not retried: it stays a hard failure, exactly
+                    # as measured in the red-team baseline.
+                    last = "400 json_validate_failed (empty generation)"
+                    if attempt == MAX_ATTEMPTS - 1:
+                        raise ProviderError(f"Groq failed after retries: {last}")
+                    print("    provider retry (empty generation)")
+                    continue
+
                 if resp.status_code != 200:
                     raise ProviderError(f"Groq {resp.status_code}: {resp.text[:300]}")
 
