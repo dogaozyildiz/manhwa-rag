@@ -4,9 +4,9 @@ A retrieval-augmented QA system (FastAPI, Postgres/pgvector, Groq) and the
 Telegram/Discord/WhatsApp bot in front of it, threat-modelled, attacked,
 hardened and re-measured. Everything here is reproducible from this repo.
 
-**Status (2026-11-19):** baseline and first mitigations done. Pending:
-regression eval of the mitigations, automated red team (promptfoo),
-source-trust control for planted falsehoods (M4).
+**Status (2026-11-20):** baseline, mitigations and regression eval done.
+Pending: automated red team (promptfoo), source-trust control for planted
+falsehoods (M4).
 
 ## Headline finding
 
@@ -51,6 +51,29 @@ not statistically tight.
 Full table and raw responses: [`redteam/RESULTS.md`](redteam/RESULTS.md),
 `redteam/{baseline,after,after-m1-m2}/*.json`.
 
+## Did the hardening hurt normal answers?
+
+Same 30-question golden set, same model, run once with every mitigation off and
+once with all on (`eval/results/20b-hardening-{off,on}.md`):
+
+| Metric | Hardening off | Hardening on |
+|---|---|---|
+| Refusal accuracy on unanswerable questions | 5/5 | 5/5 |
+| False refusals on answerable questions | 2 | 1 |
+| Citation groundedness | 0.921 (70/76) | 0.864 (70/81) |
+| Claims rejected by the link filter (M1) | -- | **0** |
+| Median latency | 3.4 s | 2.8 s |
+| Provider errors | 1 | 0 |
+
+Groundedness fell, but 5 of the 11 rejections came from a single question whose
+claims all failed verification, so the system refused it instead of showing
+unverified claims -- safe, but that is the run's one false refusal. Excluding
+that question, rejections are 6 vs 6. Difference over all claims: Fisher's exact test
+p = 0.31, i.e. not distinguishable from run-to-run variance at n = 1 run each.
+The link filter rejected nothing legitimate. **Conclusion: no measurable
+quality cost; a repeated-run comparison would be needed to rule out a small
+one.**
+
 ## What was fixed
 
 | ID | Issue | Fix | Evidence |
@@ -76,7 +99,8 @@ Full table and raw responses: [`redteam/RESULTS.md`](redteam/RESULTS.md),
    change the answer's content without a link.
 4. **Rate limits are per process.** A multi-instance deployment needs a shared
    store (e.g. Redis).
-5. **Regression of normal answers is not yet measured** for M1/M2 (pending eval).
+5. **Regression evidence is one run per condition** (see above); enough to
+   rule out a large quality cost, not a small one.
 6. **Images install the newest dependency versions**, not the audited lock files:
    the lock files were generated on Windows/Python 3.14, the images run
    Linux/Python 3.13. Fix: generate the lock inside the build image.
