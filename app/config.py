@@ -59,6 +59,26 @@ class Settings(BaseSettings):
     # quotas up front, so it is a rate-limit parameter as much as a length one.
     max_output_tokens: int = 1200
 
+    # Security hardening (see docs/THREAT_MODEL.md, redteam/). Each mitigation
+    # is a flag so before/after runs are reproducible without switching branches.
+    # M2: sources wrapped in delimiters and declared untrusted in the prompt.
+    harden_prompt: bool = True
+    # M1: remove links/emails not on the allowlist from model output.
+    filter_output_links: bool = True
+    link_allowlist: list[str] = ["wikipedia.org", "anilist.co"]
+    # When an answer is a refusal, show a fixed message instead of the model's
+    # prose. Red-team runs showed refused=true answers that still asserted the
+    # planted falsehood in full.
+    strict_refusals: bool = True
+    # T6: access control and consumption limits (app/security.py).
+    # Empty API_KEY = open API, allowed only on 127.0.0.1 (scripts/serve.py).
+    api_key: str = ""
+    # Set to true in every deployment image (Dockerfile). Startup then fails
+    # unless API_KEY is set, whatever command or host the platform uses.
+    require_api_key: bool = False
+    rate_limit_per_minute: int = 10
+    llm_daily_budget: int = 300
+
     # Load the embedding model when the server boots rather than on the first
     # question. Importing torch and loading the model costs ~80s on a cold
     # process; paid lazily, that lands on whoever asks first, and an 80-second

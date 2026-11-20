@@ -28,6 +28,19 @@ dead end:
 
 ---
 
+## Security
+
+This system has been threat-modelled, attacked and hardened. Headline finding:
+**citation verification proves a quote exists, not that its source is
+trustworthy** -- a single poisoned source produced verified false claims in 9/9
+runs and injected links in 7/9, before mitigation (links: 0/9 after).
+
+- Case study, results and residual risk: [`SECURITY.md`](SECURITY.md)
+- Threat model (OWASP Top 10 for LLM Applications): [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+- Reproducible attack harness: [`redteam/`](redteam/)
+
+---
+
 ## What it does
 
 Two corpora, because they answer different questions:
@@ -80,6 +93,10 @@ recommendations, 6 industry questions, 5 deliberately unanswerable.
 | recommend | 5 | 0.800 | 0.595 |
 
 ### Answer quality
+
+> **Note (2026-11):** Groq has since retired `llama-3.1-8b-instant`; the
+> security work in [`SECURITY.md`](SECURITY.md) uses `openai/gpt-oss-20b`.
+> The numbers below are the historical baseline and cannot be re-run as-is.
 
 Measured on `llama-3.1-8b-instant` with k=3 and sources truncated to 1200
 characters — all three forced by free-tier limits. A larger model with more

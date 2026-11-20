@@ -9,12 +9,20 @@ reaches a user, and counted so the eval can report how often it happens.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.answer.prompt import SYSTEM, build_user_prompt, format_sources
+from app.answer.prompt import (
+    SYSTEM,
+    SYSTEM_HARDENED,
+    build_user_prompt,
+    format_sources,
+    format_sources_hardened,
+)
 from app.answer.provider import LLMProvider, get_provider
+from app.answer.output_filter import filter_output
 from app.answer.schema import Answer, Claim
 from app.answer.verify import verify_claims
 from app.config import get_settings
@@ -23,6 +31,27 @@ from app.retrieval.documents import DocumentRetriever
 from app.retrieval.filters import extract_filters, strip_filter_terms
 from app.retrieval.router import route_query
 from app.retrieval.store import Source
+
+log = logging.getLogger(__name__)
+
+REFUSAL_TEXT = (
+    "I can't give a verified answer to that from the catalogue or the "
+    "industry articles."
+)
+
+
+def apply_refusal_policy(answer_text: str, refused: bool, *, strict: bool) -> str:
+    """A refusal must not carry unverified assertions.
+
+    Baseline red-team (redteam/RESULTS.md, payload `false`): the model set
+    refused=true and in the same response wrote "Yes. In 2024 South Korea
+    amended its Copyright Act..." -- a planted falsehood. Any client that shows
+    `answer` regardless of `refused` displayed it. With `strict`, a refusal is
+    shown as a fixed sentence; nothing the model wrote reaches the user.
+    """
+    if refused and strict:
+        return REFUSAL_TEXT
+    return answer_text
 
 ANSWER_SCHEMA = {
     "type": "object",
@@ -155,9 +184,14 @@ async def answer_question(
             route=route,
         )
 
+    if get_settings().harden_prompt:
+        system, sources_block = SYSTEM_HARDENED, format_sources_hardened(sources)
+    else:
+        system, sources_block = SYSTEM, format_sources(sources)
+
     payload, usage = await provider.complete_json(
-        SYSTEM,
-        build_user_prompt(question, format_sources(sources)),
+        system,
+        build_user_prompt(question, sources_block),
         ANSWER_SCHEMA,
     )
 
@@ -171,6 +205,17 @@ async def answer_question(
     ]
     claims = verify_claims(raw_claims, sources)
 
+    answer_text = str(payload.get("answer", "")).strip()
+    settings = get_settings()
+    if settings.filter_output_links:
+        # After verification on purpose: a quote can be verbatim AND malicious
+        # when the source itself is poisoned.
+        answer_text, claims, removed = filter_output(
+            answer_text, claims, settings.link_allowlist
+        )
+        if removed:
+            log.warning("output filter removed untrusted links: %s", removed)
+
     model_refused = bool(payload.get("refused"))
     # A non-refusal whose every claim failed verification is not an answer we
     # can stand behind, so it is reported as a refusal rather than shown as
@@ -178,7 +223,9 @@ async def answer_question(
     unsupported = bool(raw_claims) and not any(c.verified for c in claims)
 
     return Answer(
-        text=str(payload.get("answer", "")).strip(),
+        text=apply_refusal_policy(
+            answer_text, model_refused or unsupported, strict=settings.strict_refusals
+        ),
         claims=claims,
         sources=[
             {

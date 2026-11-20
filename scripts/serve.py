@@ -30,6 +30,15 @@ def main() -> None:
     parser.add_argument("--reload", action="store_true")
     args = parser.parse_args()
 
+    # T6: never expose an unauthenticated API beyond this machine.
+    from app.config import get_settings
+
+    if args.host not in ("127.0.0.1", "localhost", "::1") and not get_settings().api_key:
+        raise SystemExit(
+            f"Refusing to listen on {args.host} without API_KEY set: the API would "
+            "be open to anyone who can reach it. Set API_KEY in .env."
+        )
+
     config = uvicorn.Config(
         "app.api:app",
         host=args.host,

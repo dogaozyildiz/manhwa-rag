@@ -3,11 +3,16 @@ services:
     image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: manhwa
-      POSTGRES_PASSWORD: manhwa
+      # Default only for a laptop. On any server set POSTGRES_PASSWORD in .env
+      # and update DATABASE_URL to match.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manhwa}
       POSTGRES_DB: manhwa
     # 5434 to avoid colliding with any other local Postgres.
+    # Bound to 127.0.0.1: a bare "5434:5432" listens on every interface, and on
+    # a server Docker's own iptables rules bypass ufw -- the database would be
+    # reachable from the internet with the default password. (THREAT_MODEL T8)
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

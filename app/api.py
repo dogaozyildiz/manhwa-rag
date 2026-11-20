@@ -15,6 +15,7 @@ from app.answer.provider import ProviderError
 from app.config import get_settings
 from app.db import get_session
 from app.ingest.embedder import get_embedder
+from app.security import llm_budget, rate_limited, require_api_key, ui_enabled
 from app.retrieval.catalogue import CatalogueRetriever
 from app.retrieval.documents import DocumentRetriever
 
@@ -37,7 +38,15 @@ async def lifespan(_: FastAPI):
     and a failure here is fatal by design: a server that cannot embed cannot
     retrieve, and should say so at boot rather than at request time.
     """
-    if get_settings().warm_embedder:
+    settings = get_settings()
+    if settings.require_api_key and not settings.api_key:
+        # T6: the Dockerfile starts uvicorn directly on 0.0.0.0, bypassing the
+        # host check in scripts/serve.py. This check runs however it starts.
+        raise RuntimeError(
+            "REQUIRE_API_KEY is set but API_KEY is empty: refusing to serve an "
+            "open API. Set API_KEY in the deployment environment."
+        )
+    if settings.warm_embedder:
         started = time.perf_counter()
         await get_embedder().embed_query("warmup")
         print(f"embedder warm in {time.perf_counter() - started:.1f}s")
@@ -90,7 +99,7 @@ async def health(session: AsyncSession = Depends(get_session)) -> dict:
     }
 
 
-@app.post("/retrieve")
+@app.post("/retrieve", dependencies=[Depends(require_api_key), Depends(rate_limited)])
 async def retrieve_only(
     payload: AskRequest, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -113,7 +122,11 @@ async def retrieve_only(
     }
 
 
-@app.post("/ask", response_model=AskResponse)
+@app.post(
+    "/ask",
+    response_model=AskResponse,
+    dependencies=[Depends(require_api_key), Depends(rate_limited), Depends(llm_budget)],
+)
 async def ask(
     payload: AskRequest, session: AsyncSession = Depends(get_session)
 ) -> AskResponse:
@@ -141,12 +154,16 @@ async def ask(
     )
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, dependencies=[Depends(ui_enabled)])
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "index.html", {})
 
 
-@app.post("/ui/ask", response_class=HTMLResponse)
+@app.post(
+    "/ui/ask",
+    response_class=HTMLResponse,
+    dependencies=[Depends(ui_enabled), Depends(rate_limited), Depends(llm_budget)],
+)
 async def ui_ask(
     request: Request,
     question: str = Form(...),

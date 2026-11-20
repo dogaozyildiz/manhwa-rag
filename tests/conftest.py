@@ -138,3 +138,16 @@ async def seeded_catalogue(stub_embedder):
 
     async with session_scope() as session:
         await session.execute(delete(Series).where(Series.anilist_id.in_(ids)))
+
+
+
+@pytest.fixture(autouse=True)
+def _reset_security_state():
+    """Rate-limit and budget counters are process-global; isolate each test."""
+    from app import security
+
+    security.window.reset()
+    security.budget.reset()
+    yield
+    security.window.reset()
+    security.budget.reset()
